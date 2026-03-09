@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cat Detection Nueral network</title>
+    <style>
+        :root {
+            --bg-base: #E2E8F0;
+            --bg-panel: #FFFFFF;
+            --border-color: #94A3B8;
+            --text-main: #0F172A;
+            --text-muted: #334155;
+            --accent: #2563EB;
+            --accent-glow: rgba(37, 99, 235, 0.4);
+            --success: #059669;
+            --danger: #DC2626;
+            --warning: #D97706;
+            --node-off: #94A3B8;
+            --line-off: #CBD5E1;
+            --ar-color: #1D4ED8;
+            --log-bg: #F1F5F9;
+            --log-text: #047857;
+            --modal-bg: rgba(255, 255, 255, 0.95);
+            --term-bg: #F8FAFC;
+            --term-text: #047857;
+        }
+
+        [data-theme="dark"] {
+            --bg-base: #0B0E14;
+            --bg-panel: #151A22;
+            --border-color: #2A3241;
+            --text-main: #E2E8F0;
+            --text-muted: #94A3B8;
+            --accent: #3B82F6;
+            --accent-glow: rgba(59, 130, 246, 0.4);
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --node-off: #1E293B;
+            --line-off: #1E293B;
+            --ar-color: #93C5FD;
+            --log-bg: #000000;
+            --log-text: #00FF41;
+            --modal-bg: rgba(11, 14, 20, 0.95);
+            --term-bg: #000000;
+            --term-text: #00FF41;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Consolas', 'Courier New', monospace;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        #terminal-screen {
+            position: fixed;
+            inset: 0;
+            background-color: var(--term-bg);
+            color: var(--term-text);
+            padding: 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .term-line { 
+            margin-bottom: 12px; 
+            opacity: 0; 
+        }
+
+        #main-app {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn { 
+            from { opacity: 0; } 
+            to { opacity: 1; } 
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .header h1 { 
+            font-size: 2.2rem; 
+            letter-spacing: 2px; 
+            text-transform: uppercase; 
+            font-weight: bold;
+        }
+
+        .theme-toggle-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: auto;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-width: 2px;
+            background: var(--bg-panel);
+        }
+
+        .layout {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 2.5fr;
+            gap: 20px;
+            min-height: 0;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 0; 
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .panel-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px dashed var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        .image-container {
+            width: 100%;
+            height: 180px; 
+            background: var(--bg-base);
+            border: 3px dashed var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        #target-image { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: none; 
+            z-index: 1; 
+        }
+
+        .scanner {
+            position: absolute;
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 6px;
+            background: var(--accent);
+            box-shadow: 0 0 25px var(--accent);
+            z-index: 2;
+            display: none;
+            animation: scan 1.5s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .params-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            margin-bottom: 15px;
+            padding-right: 10px;
+        }
+        
+        .params-container::-webkit-scrollbar { width: 8px; }
+        .params-container::-webkit-scrollbar-track { background: transparent; }
+        .params-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; transition: 0.3s; }
+        .params-container::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        .param-group { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px; 
+            background: var(--bg-base);
+            padding: 12px;
+            border-radius: 6px;
+            border: 2px solid var(--border-color);
+        }
+
+        .param-group label { 
+            font-size: 1.1rem; 
+            color: var(--text-muted); 
+            font-weight: bold; 
+        }
+        
+        .ar-desc {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            font-size: 1.2rem;
+            color: var(--ar-color);
+            font-weight: bold;
+            direction: rtl;
+            margin-bottom: 5px;
+        }
+
+        .param-group input {
+            background: var(--bg-panel);
+            border: 2px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+
+        .param-group input:focus { 
+            border-color: var(--accent); 
+            outline: none; 
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-main);
+            border: 2px solid var(--accent);
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        button:hover { 
+            background: var(--accent); 
+            color: #FFFFFF;
+            box-shadow: 0 0 15px var(--accent-glow); 
+        }
+
+        button.action-btn { 
+            background: var(--bg-base); 
+            border-color: var(--border-color); 
+            margin-bottom: 10px; 
+        }
+
+        button.action-btn:hover { 
+            border-color: var(--text-main); 
+            background: var(--text-main); 
+            color: var(--bg-panel);
+            box-shadow: none; 
+        }
+
+        button:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            pointer-events: none; 
+        }
+
+        .network-container {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            margin-bottom: 20px;
+            min-height: 0;
+        }
+
+        svg#network-lines { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 1; 
+            pointer-events: none; 
+        }
+
+        .link { 
+            stroke: var(--line-off); 
+            stroke-width: 3; 
+            transition: stroke 0.2s; 
+        }
+
+        .link.active { 
+            stroke: var(--accent); 
+            stroke-width: 4; 
+            filter: drop-shadow(0 0 8px var(--accent)); 
+        }
+
+        .layer { 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-evenly; 
+            height: 100%; 
+            z-index: 2; 
+            width: 60px; 
+        }
+
+        .layer-title { 
+            position: absolute; 
+            top: -15px; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            color: var(--text-muted); 
+            width: 120px; 
+            text-align: center; 
+            transform: translateX(-30px); 
+        }
+
+        .node {
+            width: 28px; 
+            height: 28px;
+            background: var(--node-off);
+            border-radius: 50%;
+            border: 3px solid var(--bg-panel);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .node.active { 
+            background: var(--accent); 
+            box-shadow: 0 0 20px var(--accent); 
+            transform: scale(1.5); 
+        }
+
+        .node.success { 
+            background: var(--success); 
+            box-shadow: 0 0 30px var(--success); 
+            transform: scale(2); 
+            border-color: var(--success);
+        }
+
+        .node.danger { 
+            background: var(--danger); 
+            box-shadow: 0 0 30px var(--danger); 
+            transform: scale(2); 
+            border-color: var(--danger);
+        }
+
+        .bottom-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 220px; 
+            flex-shrink: 0;
+        }
+
+        .math-log-container {
+            background: var(--log-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            height: 100%;
+            overflow-y: auto;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--log-text);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-weight: bold;
+        }
+
+        .math-log-container::-webkit-scrollbar { width: 8px; }
+        .math-log-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        #result-box {
+            padding: 20px; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-size: 2rem; 
+            font-weight: bold;
+            letter-spacing: 2px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 4px solid; 
+            background: var(--bg-base);
+            border-color: var(--border-color);
+            color: var(--text-muted);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        #image-modal { 
+            position: fixed; 
+            inset: 0; 
+            background: var(--modal-bg); 
+            backdrop-filter: blur(8px); 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 500; 
+        }
+
+        .modal-content { 
+            background: var(--bg-panel); 
+            padding: 30px; 
+            border-radius: 12px; 
+            border: 2px solid var(--border-color); 
+            width: 80%; 
+            max-width: 1000px; 
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .modal-header-text { 
+            font-size: 1.8rem; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            font-weight: bold; 
+            border-bottom: 2px solid var(--border-color); 
+            padding-bottom: 10px;
+        }
+        
+        .modal-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .thumbnail-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 15px; 
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 10px;
+        }
+
+        .thumbnail-grid::-webkit-scrollbar { width: 8px; }
+        .thumbnail-grid::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        
+        .img-option { 
+            width: 100%; 
+            aspect-ratio: 1/1; 
+            object-fit: cover; 
+            border: 3px solid var(--border-color); 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: 0.2s; 
+            opacity: 0.7; 
+        }
+
+        .img-option:hover { 
+            border-color: var(--accent); 
+            opacity: 1; 
+        }
+
+        .img-option.selected { 
+            border-color: var(--success); 
+            opacity: 1; 
+            box-shadow: 0 0 15px var(--success); 
+        }
+        
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-left: 3px solid var(--border-color);
+            padding-left: 30px;
+        }
+
+        #large-preview-img {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border: 3px solid var(--border-color);
+            border-radius: 8px;
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .preview-placeholder {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .modal-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            padding-top: 15px;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .modal-actions button { 
+            width: auto; 
+            padding: 12px 30px; 
+        }
+    </style>
+</head>
+<body>
+
+    <div id="terminal-screen">
+        <div class="term-line" id="t1">> INITIALIZING NEURAL NETWORK KERNEL...</div>
+        <div class="term-line" id="t2">> ALLOCATING TENSORS...</div>
+        <div class="term-line" id="t3">> COMPILING LAYERS: [INPUT: 6, HIDDEN_1: 8, HIDDEN_2: 6, OUTPUT: 1]</div>
+        <div class="term-line" id="t4">> LOADING PRE-TRAINED WEIGHTS...</div>
+        <div class="term-line" id="t5">> SYSTEM READY. WAITING FOR VISUAL INPUT.</div>
+    </div>
+
+    <div id="image-modal">
+        <div class="modal-content">
+            <div class="modal-header-text">SELECT TESTING DATASET</div>
+            
+            <div class="modal-body">
+                <div class="thumbnail-grid">
+                    <img src="Cat1.jpeg" class="img-option" onclick="previewImage(this)" alt="Cat1">
+                    <img src="Cat2.jpeg" class="img-option" onclick="previewImage(this)" alt="Cat2">
+                    <img src="Cat3.jpeg" class="img-option" onclick="previewImage(this)" alt="Cat3">
+                    <img src="Cat4.jpeg" class="img-option" onclick="previewImage(this)" alt="Cat4">
+                    <img src="Cat5.jpeg" class="img-option" onclick="previewImage(this)" alt="Cat5">
+                    <img src="Other1.jpeg" class="img-option" onclick="previewImage(this)" alt="Other1">
+                    <img src="Other2.jpeg" class="img-option" onclick="previewImage(this)" alt="Other2">
+                    <img src="Other3.jpeg" class="img-option" onclick="previewImage(this)" alt="Other3">
+                    <img src="Other4.jpeg" class="img-option" onclick="previewImage(this)" alt="Other4">
+                </div>
+
+                <div class="preview-pane">
+                    <div id="preview-placeholder" class="preview-placeholder">[ CLICK AN IMAGE TO PREVIEW ]</div>
+                    <img id="large-preview-img" src="" alt="Preview">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="action-btn" onclick="closeModal()">CANCEL</button>
+                <button id="confirm-btn" style="background: var(--success); border-color: var(--success); color: #FFF;" disabled onclick="confirmSelection()">CONFIRM SELECTION</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <div class="header">
+            <h1>CAT DETECTION NEURAL NETWORK</h1>
+            <button id="theme-toggle-btn" class="action-btn theme-toggle-btn" onclick="toggleTheme()">[ DARK MODE ]</button>
+        </div>
+
+        <div class="layout">
+            <div class="panel">
+                <div class="panel-title">1. Input & Parameters</div>
+                
+                <div class="image-container" id="img-container">
+                    <span id="placeholder-text" style="color: var(--text-muted); font-size: 1.2rem; font-weight: bold;">NO IMAGE SELECTED</span>
+                    <img id="target-image" src="" alt="Target">
+                    <div class="scanner" id="scanner-line"></div>
+                </div>
+
+                <button class="action-btn" onclick="openModal()" id="load-btn">LOAD IMAGE DATASET</button>
+
+                <div class="params-container">
+                    <div class="param-group">
+                        <label>Weight 1</label>
+                        <div class="ar-desc">شكل الأذن المدببة</div>
+                        <input type="number" id="w1" value="0.8" step="0.1">
+                    </div>
+                    <div class="param-group">
+                        <label>Weight 2</label>
+                        <div class="ar-desc">وضوح الشوارب</div>
+                        <input type="number" id="w2" value="0.5" step="0.1">
+                    </div>
+                    <div class="param-group">
+                        <label>Weight 3</label>
+                        <div class="ar-desc">حجم وشكل الجسم</div>
+                        <input type="number" id="w3" value="0.3" step="0.1">
+                    </div>
+                    <div class="param-group">
+                        <label>Bias</label>
+                        <div class="ar-desc">الانحياز (لضبط الحساسية)</div>
+                        <input type="number" id="bias" value="1.2" step="0.1">
+                    </div>
+                </div>
+
+                <button onclick="startAnalysis()" id="analyze-btn" style="background: var(--success); border-color: var(--success); color: #FFF; display: none;">START ANALYSIS</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">2. Processing & Layers</div>
+                
+                <div class="network-container" id="network-container">
+                    <svg id="network-lines"></svg>
+
+                    <div class="layer"><div class="layer-title">Input</div>
+                        <div class="node n-in"></div><div class="node n-in"></div><div class="node n-in"></div><div class="node n-in"></div><div class="node n-in"></div><div class="node n-in"></div>
+                    </div>
+                    
+                    <div class="layer"><div class="layer-title">Hidden 1</div>
+                        <div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div><div class="node n-h1"></div>
+                    </div>
+
+                    <div class="layer"><div class="layer-title">Hidden 2</div>
+                        <div class="node n-h2"></div><div class="node n-h2"></div><div class="node n-h2"></div><div class="node n-h2"></div><div class="node n-h2"></div><div class="node n-h2"></div>
+                    </div>
+                    
+                    <div class="layer"><div class="layer-title">Output</div>
+                        <div class="node n-out" id="final-node"></div>
+                    </div>
+                </div>
+
+                <div class="bottom-section">
+                    <div class="math-log-container" id="math-log">
+                        <div>> Awaiting execution...</div>
+                    </div>
+                    <div id="result-box">
+                        <span style="font-size: 1.4rem; margin-bottom: 10px;">FINAL STATUS</span>
+                        <div>AWAITING...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = () => {
+            const lines = ['t1', 't2', 't3', 't4', 't5'];
+            lines.forEach((id, index) => { setTimeout(() => { document.getElementById(id).style.opacity = '1'; }, index * 300); });
+            setTimeout(() => {
+                document.getElementById('terminal-screen').style.display = 'none';
+                document.getElementById('main-app').style.display = 'flex';
+                drawNetworkLines(); 
+            }, lines.length * 300 + 500);
+        };
+
+        function toggleTheme() {
+            const doc = document.documentElement;
+            const btn = document.getElementById('theme-toggle-btn');
+            
+            if (doc.getAttribute('data-theme') === 'dark') {
+                doc.removeAttribute('data-theme');
+                btn.innerHTML = '[ DARK MODE ]';
+            } else {
+                doc.setAttribute('data-theme', 'dark');
+                btn.innerHTML = '[ LIGHT MODE ]';
+            }
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            if(document.getElementById('main-app').style.display !== 'none'){
+                drawNetworkLines();
+            }
+        });
+        resizeObserver.observe(document.getElementById('network-container'));
+
+        function drawNetworkLines() {
+            const svg = document.getElementById('network-lines');
+            if(!svg) return;
+            svg.innerHTML = ''; 
+            const container = document.getElementById('network-container');
+            const containerRect = container.getBoundingClientRect();
+            const layers = document.querySelectorAll('.layer');
+
+            for (let i = 0; i < layers.length - 1; i++) {
+                const nodesA = layers[i].querySelectorAll('.node');
+                const nodesB = layers[i+1].querySelectorAll('.node');
+
+                nodesA.forEach((nodeA) => {
+                    const rectA = nodeA.getBoundingClientRect();
+                    const x1 = rectA.left + (rectA.width / 2) - containerRect.left;
+                    const y1 = rectA.top + (rectA.height / 2) - containerRect.top;
+
+                    nodesB.forEach((nodeB) => {
+                        const rectB = nodeB.getBoundingClientRect();
+                        const x2 = rectB.left + (rectB.width / 2) - containerRect.left;
+                        const y2 = rectB.top + (rectB.height / 2) - containerRect.top;
+
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x1);
+                        line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2);
+                        line.setAttribute('y2', y2);
+                        line.classList.add('link', `link-layer-${i}`);
+                        svg.appendChild(line);
+                    });
+                });
+            }
+        }
+
+        let tempSelectedSrc = '';
+
+        function openModal() { 
+            document.getElementById('image-modal').style.display = 'flex'; 
+        }
+        
+        function closeModal() { 
+            document.getElementById('image-modal').style.display = 'none'; 
+        }
+        
+        function previewImage(imgElement) {
+            document.querySelectorAll('.img-option').forEach(el => el.classList.remove('selected'));
+            imgElement.classList.add('selected');
+            
+            tempSelectedSrc = imgElement.src;
+            document.getElementById('preview-placeholder').style.display = 'none';
+            const largePreview = document.getElementById('large-preview-img');
+            largePreview.src = tempSelectedSrc;
+            largePreview.style.display = 'block';
+            
+            document.getElementById('confirm-btn').disabled = false;
+        }
+
+        function confirmSelection() {
+            if(!tempSelectedSrc) return;
+            
+            document.getElementById('target-image').src = tempSelectedSrc;
+            document.getElementById('target-image').style.display = 'block';
+            document.getElementById('placeholder-text').style.display = 'none';
+            document.getElementById('analyze-btn').style.display = 'block';
+            
+            resetUI();
+            closeModal();
+        }
+
+        function resetUI() {
+            document.querySelectorAll('.node').forEach(el => el.className = 'node ' + el.classList[1]);
+            document.querySelectorAll('.link').forEach(el => el.classList.remove('active'));
+            document.getElementById('scanner-line').style.display = 'none';
+            
+            const resultBox = document.getElementById('result-box');
+            resultBox.style.borderColor = 'var(--border-color)';
+            resultBox.style.color = 'var(--text-muted)';
+            resultBox.style.backgroundColor = 'var(--bg-base)';
+            resultBox.innerHTML = '<span style="font-size: 1.4rem; margin-bottom: 10px;">FINAL STATUS</span><div>AWAITING...</div>';
+            
+            document.getElementById('math-log').innerHTML = '> Awaiting execution...';
+        }
+
+        function activateRandomSubset(selector, count) {
+            let elements = Array.from(document.querySelectorAll(selector));
+            elements.sort(() => 0.5 - Math.random());
+            elements.slice(0, count).forEach(el => el.classList.add('active'));
+        }
+
+        let simulationInterval;
+        let mathLogInterval;
+
+        function startAnalysis() {
+            resetUI();
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true;
+            btn.innerText = "PROCESSING...";
+            document.getElementById('scanner-line').style.display = 'block';
+            document.getElementById('math-log').innerHTML = '> Starting Analysis...<br>';
+            document.getElementById('result-box').innerHTML = '<span style="font-size: 1.4rem; margin-bottom: 10px;">FINAL STATUS</span><div>PROCESSING...</div>';
+
+            const w1 = document.getElementById('w1').value;
+            const w2 = document.getElementById('w2').value;
+            const bias = document.getElementById('bias').value;
+
+            let waveStep = 0;
+            simulationInterval = setInterval(() => {
+                document.querySelectorAll('.node, .link').forEach(el => el.classList.remove('active'));
+
+                if (waveStep === 0) {
+                    activateRandomSubset('.n-in', 5);
+                    activateRandomSubset('.link-layer-0', 12);
+                } else if (waveStep === 1) {
+                    activateRandomSubset('.n-h1', 6);
+                    activateRandomSubset('.link-layer-1', 10);
+                } else if (waveStep === 2) {
+                    activateRandomSubset('.n-h2', 5);
+                    activateRandomSubset('.link-layer-2', 5);
+                }
+                
+                waveStep = (waveStep + 1) % 3;
+            }, 250);
+
+            let timeElapsed = 0;
+            const totalDuration = 7000;
+
+            mathLogInterval = setInterval(() => {
+                timeElapsed += 350; 
+                let p1 = (Math.random() * 255).toFixed(1);
+                let p2 = (Math.random() * 255).toFixed(1);
+                
+                let sum = ((p1 * w1) + (p2 * w2) + parseFloat(bias)).toFixed(2);
+                let activation = (sum > 100) ? 1 : 0; 
+                
+                const logBox = document.getElementById('math-log');
+                logBox.innerHTML += `[Node] (${p1}*${w1}) + (${p2}*${w2}) + ${bias} = ${sum} <br>`;
+                logBox.innerHTML += `<span style="color:var(--warning)">> Act_Fn(ReLU): ${activation}</span><br><br>`;
+                
+                logBox.scrollTop = logBox.scrollHeight;
+
+                if (timeElapsed >= totalDuration) {
+                    clearInterval(simulationInterval);
+                    clearInterval(mathLogInterval);
+                    finishAnalysis();
+                }
+            }, 350);
+        }
+
+        function finishAnalysis() {
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = false;
+            btn.innerText = "START ANALYSIS";
+            document.getElementById('scanner-line').style.display = 'none';
+
+            document.querySelectorAll('.node, .link').forEach(el => el.classList.remove('active'));
+
+            const imgSrc = document.getElementById('target-image').src.toLowerCase();
+            const isCat = imgSrc.includes('cat');
+            
+            const logBox = document.getElementById('math-log');
+            logBox.innerHTML += `<br><span style="color:var(--log-text)">> COMPLETE. OUTPUT GENERATED.</span>`;
+            logBox.scrollTop = logBox.scrollHeight;
+
+            const finalNode = document.getElementById('final-node');
+            const resultBox = document.getElementById('result-box');
+
+            if (isCat) {
+                finalNode.classList.add('success');
+                resultBox.style.borderColor = 'var(--success)';
+                resultBox.style.color = 'var(--success)';
+                resultBox.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                resultBox.innerHTML = '<span style="font-size: 1.4rem; margin-bottom: 10px;">FINAL STATUS</span><div>[ POSITIVE MATCH ]<br>CAT DETECTED</div>';
+            } else {
+                finalNode.classList.add('danger');
+                resultBox.style.borderColor = 'var(--danger)';
+                resultBox.style.color = 'var(--danger)';
+                resultBox.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                resultBox.innerHTML = '<span style="font-size: 1.4rem; margin-bottom: 10px;">FINAL STATUS</span><div>[ NEGATIVE MATCH ]<br>UNKNOWN</div>';
+            }
+        }
+    </script>
+</body>
+</html>
